@@ -14,7 +14,8 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
+# Expose port
 EXPOSE 2000
 
-# Run compiled JS
+# Run the compiled JS
 CMD ["npm", "run", "start"]
