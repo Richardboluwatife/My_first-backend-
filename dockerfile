@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 
 # Build TypeScript
-RUN npm run build
+RUN npm run dev
 
 # Expose port
 EXPOSE 2000
