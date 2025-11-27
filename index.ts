@@ -240,8 +240,6 @@ app.get("/", (req, res) => {
     res.send("Welcome!");
 });
 
-//
-
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });
