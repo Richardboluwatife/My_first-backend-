@@ -173,6 +173,7 @@ router.get("/users/me", authenticateToken, async (req: Request, res: Response) =
  *               - name
  *               - email
  *               - password
+ *               - user_type
  *             properties:
  *               name:
  *                 type: string
@@ -180,26 +181,49 @@ router.get("/users/me", authenticateToken, async (req: Request, res: Response) =
  *                 type: string
  *               password:
  *                 type: string
-  *     responses:
+ *               user_type:
+ *                 type: string
+ *                 enum: [landlord, tenant]
+ *     responses:
  *       201:
  *         description: User created
  */
 router.post("/users", async (req: Request, res: Response) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, user_type } = req.body;
 
-        const hashedPassword = await bcryptjs.hash(password, 10);
+        if (!["landlord", "tenant"].includes(user_type)) {
+            return res.status(400).json({ message: "user_type must be 'landlord' or 'tenant'" });
+        }
 
-        const otp = generateOTP();
-        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-        const result = await pool.query(
-            `INSERT INTO users (name, email, password, otp, otp_expires_at, verified)
-         VALUES ($1, $2, $3, $4, $5, false)
-         RETURNING id, name, email`,
-            [name, email, hashedPassword, otp, otpExpiresAt]
+        // Check if a user with this email & type already exists
+        const check = await pool.query(
+            "SELECT * FROM users WHERE email = $1 AND user_type = $2",
+            [email, user_type]
         );
 
+        if (check.rows.length > 0) {
+            return res.status(400).json({
+                message: `A ${user_type} account with this email already exists`,
+            });
+        }
+
+        // Hash password
+        const hashedPassword = await bcryptjs.hash(password, 10);
+
+        // Generate OTP
+        const otp = generateOTP();
+        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+        // Insert new user
+        const result = await pool.query(
+            `INSERT INTO users (name, email, password, user_type, otp, otp_expires_at, verified)
+       VALUES ($1, $2, $3, $4, $5, $6, false)
+       RETURNING id, name, email, user_type`,
+            [name, email, hashedPassword, user_type, otp, otpExpiresAt]
+        );
+
+        // Send OTP via email
         await sendOTPEmail(email, otp);
 
         res.status(201).json({
@@ -210,6 +234,7 @@ router.post("/users", async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error creating user", error: error.message });
     }
 });
+
 
 /**
  * ------------------------
