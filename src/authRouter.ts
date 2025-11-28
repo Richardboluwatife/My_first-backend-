@@ -54,38 +54,25 @@ interface VerifyOtpBody {
  *         description: User not found
  */
 router.post("/login", async (req: Request, res: Response) => {
+    const { email, password } = req.body;
+
     try {
-        const { email, password } = req.body;
-
-        const userResult = await pool.query(
-            "SELECT * FROM users WHERE email = $1",
-            [email]
-        );
-
-        const user = userResult.rows[0];
+        const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+        const user = result.rows[0];
         if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user.verified)
+            return res.status(403).json({ message: "Account not activated" });
 
-        // Check verification
-        if (!user.verified) {
-            return res.status(403).json({
-                message:
-                    "Account not activated. Check your email for OTP verification.",
-            });
-        }
+        const valid = await bcryptjs.compare(password, user.password);
+        if (!valid) return res.status(401).json({ message: "Invalid password" });
 
-        const validPassword = await bcryptjs.compare(password, user.password);
-        if (!validPassword)
-            return res.status(401).json({ message: "Invalid password" });
+        // Create tokens
+        const access = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET || "mysecretkey", { expiresIn: "1h" });
+        const refresh = jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET || "myrefreshkey", { expiresIn: "7d" });
 
-        const token = jwt.sign(
-            { id: user.id, email: user.email },
-            process.env.JWT_SECRET || "mysecretkey",
-            { expiresIn: "1h" }
-        );
-
-        res.json({ message: "Login successful", token });
-    } catch (error: any) {
-        res.status(500).json({ message: "Error logging in", error: error.message });
+        res.json({ access, refresh });
+    } catch (err: any) {
+        res.status(500).json({ message: "Error logging in", error: err.message });
     }
 });
 
@@ -341,5 +328,19 @@ router.post("/resend-otp", async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error resending OTP", error: error.message });
     }
 });
+
+router.post("/refresh", async (req: Request, res: Response) => {
+    const { refresh } = req.body;
+    if (!refresh) return res.status(401).json({ message: "No refresh token" });
+
+    try {
+        const payload = jwt.verify(refresh, process.env.JWT_REFRESH_SECRET || "myrefreshkey") as any;
+        const access = jwt.sign({ id: payload.id }, process.env.JWT_SECRET || "mysecretkey", { expiresIn: "1h" });
+        res.json({ access });
+    } catch {
+        res.status(401).json({ message: "Invalid refresh token" });
+    }
+});
+
 
 export default router;
