@@ -29,7 +29,7 @@ interface VerifyOtpBody {
  */
 /**
  * @swagger
- * /login:
+ * /auth/login:
  *   post:
  *     summary: Login user
  *     tags: [Auth]
@@ -54,26 +54,26 @@ interface VerifyOtpBody {
  */
 router.post("/login", async (req: Request, res: Response) => {
     try {
-        const { email, password } = req.body as LoginBody;
+        const { email, password } = req.body;
 
-        const result = await pool.query(
+        const userResult = await pool.query(
             "SELECT * FROM users WHERE email = $1",
             [email]
         );
 
-        const user = result.rows[0];
-        if (!user)
-            return res.status(404).json({ message: "User not found" });
+        const user = userResult.rows[0];
+        if (!user) return res.status(404).json({ message: "User not found" });
 
-        // Check if the account is verified
+        // Check verification
         if (!user.verified) {
             return res.status(403).json({
-                message: "Account not activated. Please check your email for the OTP to activate your account."
+                message:
+                    "Account not activated. Check your email for OTP verification.",
             });
         }
 
-        const isValid = await bcryptjs.compare(password, user.password);
-        if (!isValid)
+        const validPassword = await bcryptjs.compare(password, user.password);
+        if (!validPassword)
             return res.status(401).json({ message: "Invalid password" });
 
         const token = jwt.sign(
@@ -90,12 +90,12 @@ router.post("/login", async (req: Request, res: Response) => {
 
 /**
  * ------------------------
- * GET ALL USERS
+ * GET USERS
  * ------------------------
  */
 /**
  * @swagger
- * /users:
+ * /auth/users:
  *   get:
  *     summary: Get all users
  *     tags: [Auth]
@@ -106,10 +106,10 @@ router.post("/login", async (req: Request, res: Response) => {
 router.get("/users", async (req: Request, res: Response) => {
     try {
         const result = await pool.query(
-            "SELECT id, name, email FROM users ORDER BY id ASC"
+            "SELECT id, name, email, verified FROM users ORDER BY id ASC"
         );
         res.json(result.rows);
-    } catch (error: any) {
+    } catch (error) {
         res.status(500).json({ message: "Error fetching users" });
     }
 });
@@ -121,9 +121,9 @@ router.get("/users", async (req: Request, res: Response) => {
  */
 /**
  * @swagger
- * /users:
+ * /auth/users:
  *   post:
- *     summary: Create new user
+ *     summary: Register a new user
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -142,37 +142,30 @@ router.get("/users", async (req: Request, res: Response) => {
  *                 type: string
  *               password:
  *                 type: string
- *     responses:
+  *     responses:
  *       201:
  *         description: User created
  */
-
 router.post("/users", async (req: Request, res: Response) => {
     try {
         const { name, email, password } = req.body;
 
-        // Hash password
-        const hashed = await bcryptjs.hash(password, 10);
+        const hashedPassword = await bcryptjs.hash(password, 10);
 
-        // Generate OTP
         const otp = generateOTP();
+        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-        // Set expiry 5 minutes from now
-        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-
-        // Save user with OTP and expiry
         const result = await pool.query(
             `INSERT INTO users (name, email, password, otp, otp_expires_at, verified)
-             VALUES ($1, $2, $3, $4, $5, false)
-             RETURNING id, name, email`,
-            [name, email, hashed, otp, otpExpiresAt]
+         VALUES ($1, $2, $3, $4, $5, false)
+         RETURNING id, name, email`,
+            [name, email, hashedPassword, otp, otpExpiresAt]
         );
 
-        // Send OTP via email
         await sendOTPEmail(email, otp);
 
         res.status(201).json({
-            message: "User created. Check email for OTP verification (expires in 5 min)",
+            message: "User created. OTP sent (expires in 5 mins).",
             user: result.rows[0],
         });
     } catch (error: any) {
@@ -187,9 +180,9 @@ router.post("/users", async (req: Request, res: Response) => {
  */
 /**
  * @swagger
- * /verify-otp:
+ * /auth/verify-otp:
  *   post:
- *     summary: Verify user account with OTP
+ *     summary: Verify user OTP
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -221,18 +214,11 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
         );
 
         const user = result.rows[0];
+        if (!user) return res.status(400).json({ message: "Invalid OTP" });
 
-        if (!user) {
-            return res.status(400).json({ message: "Invalid OTP" });
-        }
+        if (user.otp_expires_at < new Date())
+            return res.status(400).json({ message: "OTP expired" });
 
-        // Check if OTP expired
-        const now = new Date();
-        if (user.otp_expires_at < now) {
-            return res.status(400).json({ message: "OTP expired. Please request a new one." });
-        }
-
-        // Mark user as verified and clear OTP
         await pool.query(
             "UPDATE users SET verified = true, otp = NULL, otp_expires_at = NULL WHERE email = $1",
             [email]
@@ -251,9 +237,9 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
  */
 /**
  * @swagger
- * /resend-otp:
+ * /auth/resend-otp:
  *   post:
- *     summary: Resend OTP to user email
+ *     summary: Resend OTP
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -278,14 +264,19 @@ router.post("/resend-otp", async (req: Request, res: Response) => {
     try {
         const { email } = req.body;
 
-        const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-        const user = result.rows[0];
+        const userResult = await pool.query(
+            "SELECT * FROM users WHERE email = $1",
+            [email]
+        );
+
+        const user = userResult.rows[0];
 
         if (!user) return res.status(404).json({ message: "User not found" });
-        if (user.verified) return res.status(400).json({ message: "User already verified" });
+        if (user.verified)
+            return res.status(400).json({ message: "User already verified" });
 
         const otp = generateOTP();
-        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+        const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
         await pool.query(
             "UPDATE users SET otp = $1, otp_expires_at = $2 WHERE email = $3",
@@ -294,7 +285,7 @@ router.post("/resend-otp", async (req: Request, res: Response) => {
 
         await sendOTPEmail(email, otp);
 
-        res.json({ message: "New OTP sent to email (expires in 5 min)" });
+        res.json({ message: "New OTP sent" });
     } catch (error: any) {
         res.status(500).json({ message: "Error resending OTP", error: error.message });
     }
