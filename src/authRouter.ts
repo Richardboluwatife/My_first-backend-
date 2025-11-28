@@ -3,6 +3,7 @@ import bcryptjs from "bcryptjs";
 import pool from "./db";
 import jwt from "jsonwebtoken";
 import { generateOTP, sendOTPEmail } from "./otpUtils";
+import { authenticateToken } from "./authMiddleware";
 
 const router = Router();
 
@@ -111,6 +112,49 @@ router.get("/users", async (req: Request, res: Response) => {
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ message: "Error fetching users" });
+    }
+});
+
+/**
+ * @swagger
+ * /auth/users/me:
+ *   get:
+ *     summary: Get the current logged-in user details
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 name:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                 verified:
+ *                   type: boolean
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ */
+router.get("/users/me", authenticateToken, async (req: Request, res: Response) => {
+    try {
+        const userId = (req as any).user.id; // from token
+        const result = await pool.query(
+            "SELECT id, name, email, verified FROM users WHERE id = $1",
+            [userId]
+        );
+        const user = result.rows[0];
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.json(user);
+    } catch (error: any) {
+        res.status(500).json({ message: "Error fetching user", error: error.message });
     }
 });
 

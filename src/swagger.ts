@@ -48,6 +48,7 @@ import swaggerJsDoc from "swagger-jsdoc"
  *  tags:
  *    name: RentManagement
  */
+
 const swaggerSpec = swaggerJsDoc({
     definition: {
         openapi: "3.0.0",
@@ -56,8 +57,22 @@ const swaggerSpec = swaggerJsDoc({
             version: "1.0.0",
             description: "A CRUD Rent project",
         },
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: "http",
+                    scheme: "bearer",
+                    bearerFormat: "JWT", // optional, just for UI hint
+                },
+            },
+        },
+        security: [
+            {
+                bearerAuth: [],
+            },
+        ],
     },
-    apis: ["src/**/*.ts"],
-})
+    apis: ["src/**/*.ts"], // adjust this to point to your routes
+});
 
-export default swaggerSpec
+export default swaggerSpec;
