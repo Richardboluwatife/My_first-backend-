@@ -115,14 +115,21 @@ router.get("/users", async (req: Request, res: Response) => {
     }
 });
 
+
 /**
  * @swagger
  * /auth/users/me:
  *   get:
  *     summary: Get the current logged-in user details
  *     tags: [Auth]
- *     security:
- *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         description: Bearer token
+ *         schema:
+ *           type: string
+ *           example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *     responses:
  *       200:
  *         description: Current user details
@@ -144,7 +151,7 @@ router.get("/users", async (req: Request, res: Response) => {
  */
 router.get("/users/me", authenticateToken, async (req: Request, res: Response) => {
     try {
-        const userId = (req as any).user.id; // from token
+        const userId = (req as any).user.id;
         const result = await pool.query(
             "SELECT id, name, email, verified FROM users WHERE id = $1",
             [userId]
