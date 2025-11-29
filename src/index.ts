@@ -10,7 +10,7 @@ const app = express();
 const PORT = 2000;
 
 // Correct path to swagger.yaml
-const swaggerDocument = YAML.load(path.join(__dirname, "docs", "swagger.yaml"));
+const swaggerDocument = YAML.load(path.join(__dirname, "../src/docs/swagger.yaml"));
 
 // CORS
 app.use(
