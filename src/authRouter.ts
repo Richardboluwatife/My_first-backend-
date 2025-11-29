@@ -23,36 +23,6 @@ interface VerifyOtpBody {
     otp: string;
 }
 
-/**
- * ------------------------
- * LOGIN
- * ------------------------
- */
-/**
- * @swagger
- * /auth/login:
- *   post:
- *     summary: Login user
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *       401:
- *         description: Invalid password
- *       404:
- *         description: User not found
- */
 router.post("/login", async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
@@ -76,21 +46,6 @@ router.post("/login", async (req: Request, res: Response) => {
     }
 });
 
-/**
- * ------------------------
- * GET USERS
- * ------------------------
- */
-/**
- * @swagger
- * /auth/users:
- *   get:
- *     summary: Get all users
- *     tags: [Auth]
- *     responses:
- *       200:
- *         description: List of users
- */
 router.get("/users", async (req: Request, res: Response) => {
     try {
         const result = await pool.query(
@@ -103,39 +58,7 @@ router.get("/users", async (req: Request, res: Response) => {
 });
 
 
-/**
- * @swagger
- * /auth/users/me:
- *   get:
- *     summary: Get the current logged-in user details
- *     tags: [Auth]
- *     parameters:
- *       - in: header
- *         name: Authorization
- *         required: true
- *         description: Bearer token
- *         schema:
- *           type: string
- *           example: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *     responses:
- *       200:
- *         description: Current user details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id:
- *                   type: integer
- *                 name:
- *                   type: string
- *                 email:
- *                   type: string
- *                 verified:
- *                   type: boolean
- *       401:
- *         description: Unauthorized (missing or invalid token)
- */
+
 router.get("/users/me", authenticateToken, async (req: Request, res: Response) => {
     try {
         const userId = (req as any).user.id;
@@ -152,51 +75,15 @@ router.get("/users/me", authenticateToken, async (req: Request, res: Response) =
     }
 });
 
-/**
- * ------------------------
- * CREATE USER
- * ------------------------
- */
-/**
- * @swagger
- * /auth/users:
- *   post:
- *     summary: Register a new user
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - name
- *               - email
- *               - password
- *               - user_type
- *             properties:
- *               name:
- *                 type: string
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *               user_type:
- *                 type: string
- *                 enum: [landlord, tenant]
- *     responses:
- *       201:
- *         description: User created
- */
 router.post("/users", async (req: Request, res: Response) => {
     try {
-        const { name, email, password, user_type } = req.body;
+        const { email, password, user_type } = req.body;
 
         if (!["landlord", "tenant"].includes(user_type)) {
             return res.status(400).json({ message: "user_type must be 'landlord' or 'tenant'" });
         }
 
-        // Check if a user with this email & type already exists
+        // Check if user exists
         const check = await pool.query(
             "SELECT * FROM users WHERE email = $1 AND user_type = $2",
             [email, user_type]
@@ -217,56 +104,29 @@ router.post("/users", async (req: Request, res: Response) => {
 
         // Insert new user
         const result = await pool.query(
-            `INSERT INTO users (name, email, password, user_type, otp, otp_expires_at, verified)
-       VALUES ($1, $2, $3, $4, $5, $6, false)
-       RETURNING id, name, email, user_type`,
-            [name, email, hashedPassword, user_type, otp, otpExpiresAt]
+            `INSERT INTO users (email, password, user_type, otp, otp_expires_at, verified)
+             VALUES ($1, $2, $3, $4, $5, false)
+             RETURNING id, email, user_type`,
+            [email, hashedPassword, user_type, otp, otpExpiresAt]
         );
 
         // Send OTP via email
-        await sendOTPEmail(email, otp);
+        try {
+            await sendOTPEmail(email, otp);
+        } catch (err) {
+            console.error("Failed to send OTP email:", err);
+        }
 
         res.status(201).json({
             message: "User created. OTP sent (expires in 5 mins).",
             user: result.rows[0],
         });
     } catch (error: any) {
+        console.error(error);
         res.status(500).json({ message: "Error creating user", error: error.message });
     }
 });
 
-
-/**
- * ------------------------
- * VERIFY OTP
- * ------------------------
- */
-/**
- * @swagger
- * /auth/verify-otp:
- *   post:
- *     summary: Verify user OTP
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - otp
- *             properties:
- *               email:
- *                 type: string
- *               otp:
- *                 type: string
- *     responses:
- *       200:
- *         description: Account verified successfully
- *       400:
- *         description: Invalid OTP
- */
 router.post("/verify-otp", async (req: Request, res: Response) => {
     try {
         const { email, otp } = req.body;
@@ -293,36 +153,7 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
     }
 });
 
-/**
- * ------------------------
- * RESEND OTP
- * ------------------------
- */
-/**
- * @swagger
- * /auth/resend-otp:
- *   post:
- *     summary: Resend OTP
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *     responses:
- *       200:
- *         description: New OTP sent successfully
- *       400:
- *         description: User already verified
- *       404:
- *         description: User not found
- */
+
 router.post("/resend-otp", async (req: Request, res: Response) => {
     try {
         const { email } = req.body;
