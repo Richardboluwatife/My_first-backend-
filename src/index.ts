@@ -8,21 +8,22 @@ import YAML from "yamljs";
 import path from "path";
 
 const app = express();
-const PORT = process.env.PORT || 2000; // Use host-provided port if available
+const PORT = process.env.PORT || 2000;
 
 // Swagger
 const swaggerDocument = YAML.load(path.join(__dirname, "../src/docs/swagger.yaml"));
 
-// CORS - allow requests from any origin
+// CORS - allow requests from anywhere safely
 app.use(
     cors({
         origin: (origin, callback) => {
-            // Allow requests with no origin (like Postman, server-to-server)
+            // allow requests with no origin (like curl, Postman)
             if (!origin) return callback(null, true);
-            // Allow all other origins
+
+            // allow any origin dynamically
             callback(null, true);
         },
-        credentials: true, // Needed if you use cookies or Authorization headers
+        credentials: true, // allow cookies and auth headers
     })
 );
 
