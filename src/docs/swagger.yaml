@@ -5,6 +5,7 @@ info:
 
 servers:
   - url: http://localhost:2000
+  - url: https://my-first-backend-uen5.onrender.com/
 
 tags:
   - name: Auth
