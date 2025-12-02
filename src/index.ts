@@ -13,19 +13,8 @@ const PORT = process.env.PORT || 2000;
 // Swagger
 const swaggerDocument = YAML.load(path.join(__dirname, "../src/docs/swagger.yaml"));
 
-// CORS - allow requests from anywhere safely
-app.use(
-    cors({
-        origin: (origin, callback) => {
-            // allow requests with no origin (like curl, Postman)
-            if (!origin) return callback(null, true);
-
-            // allow any origin dynamically
-            callback(null, true);
-        },
-        credentials: true, // allow cookies and auth headers
-    })
-);
+// CORS - allow all origins dynamically
+app.use(cors({ origin: true, credentials: true }));
 
 app.use(express.json());
 
@@ -34,9 +23,9 @@ app.use("/auth", authRouter);
 app.use("/users", userRouter);
 app.use("/tasks", taskRouter);
 
-// Swagger Docs
+// Swagger UI
 app.use("/", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Server running at port ${PORT}`);
 });
