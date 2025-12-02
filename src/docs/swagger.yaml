@@ -9,6 +9,10 @@ servers:
 tags:
   - name: Auth
     description: Authentication endpoints
+  - name: Users
+    description: User management endpoints
+  - name: Tasks
+    description: Task management endpoints
 
 components:
   securitySchemes:
@@ -41,17 +45,51 @@ paths:
         404:
           description: User not found
 
-  /auth/users:
+  /users:
     get:
       summary: Get all users
-      tags: [Auth]
+      tags: [Users]
       responses:
         200:
           description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    first_name:
+                      type: string
+                      example: John
+                    middle_name:
+                      type: string
+                      example: Michael
+                    last_name:
+                      type: string
+                      example: Doe
+                    phone_number:
+                      type: string
+                      example: "+2348012345678"
+                    personal_house_address:
+                      type: string
+                      example: "123 Main Street, Lagos"
+                    user_image:
+                      type: string
+                      example: "base64encodedstring"
+                    verified:
+                      type: boolean
+                      example: true
+                    user_type:
+                      type: string
+                      example: "tenant"
 
     post:
       summary: Register a new user
-      tags: [Auth]
+      tags: [Users]
       requestBody:
         required: true
         content:
@@ -73,24 +111,172 @@ paths:
       responses:
         201:
           description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User created. OTP sent (expires in 5 mins)."
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      email:
+                        type: string
+                        example: "example@example.com"
+                      user_type:
+                        type: string
+                        example: "tenant"
 
-  /auth/users/me:
+  /users/me:
     get:
       summary: Get current user details
-      tags: [Auth]
+      tags: [Users]
       security:
         - bearerAuth: []
-      parameters:
-        - in: header
-          name: Authorization
-          required: true
-          schema:
-            type: string
       responses:
         200:
           description: Current user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 1
+                  first_name:
+                    type: string
+                    example: John
+                  middle_name:
+                    type: string
+                    example: Michael
+                  last_name:
+                    type: string
+                    example: Doe
+                  phone_number:
+                    type: string
+                    example: "+2348012345678"
+                  personal_house_address:
+                    type: string
+                    example: "123 Main Street, Lagos"
+                  user_image:
+                    type: string
+                    example: "base64encodedstring"
+                  verified:
+                    type: boolean
+                    example: true
+                  user_type:
+                    type: string
+                    example: "tenant"
         401:
           description: Unauthorized
+
+    patch:
+      summary: Update current user details
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                  example: John
+                middle_name:
+                  type: string
+                  example: Michael
+                last_name:
+                  type: string
+                  example: Doe
+                phone_number:
+                  type: string
+                  example: "+2348012345678"
+                personal_house_address:
+                  type: string
+                  example: "123 Main Street, Lagos"
+                user_image:
+                  type: string
+                  format: binary
+                  example: "base64encodedstring"
+                password:
+                  type: string
+                  format: password
+                  example: "newpassword123"
+      responses:
+        200:
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User updated"
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      first_name:
+                        type: string
+                        example: John
+                      middle_name:
+                        type: string
+                        example: Michael
+                      last_name:
+                        type: string
+                        example: Doe
+                      phone_number:
+                        type: string
+                        example: "+2348012345678"
+                      personal_house_address:
+                        type: string
+                        example: "123 Main Street, Lagos"
+                      user_image:
+                        type: string
+                        example: "base64encodedstring"
+                      verified:
+                        type: boolean
+                        example: true
+                      user_type:
+                        type: string
+                        example: "tenant"
+        400:
+          description: No fields provided for update
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "No fields to update"
+        401:
+          description: Unauthorized
+        500:
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Error updating user"
+                  error:
+                    type: string
+                    example: "Database error message"
 
   /auth/verify-otp:
     post:
@@ -146,3 +332,30 @@ paths:
       responses:
         200:
           description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      example: 1
+                    title:
+                      type: string
+                      example: "Fix the leak"
+                    description:
+                      type: string
+                      example: "Leaking pipe in kitchen"
+                    status:
+                      type: string
+                      example: "in progress"
+                    created_at:
+                      type: string
+                      format: date-time
+                      example: "2025-12-01T10:00:00Z"
+                    updated_at:
+                      type: string
+                      format: date-time
+                      example: "2025-12-01T11:00:00Z"
