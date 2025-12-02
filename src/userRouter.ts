@@ -3,7 +3,26 @@ import bcryptjs from "bcryptjs";
 import { authenticateToken } from "./authMiddleware";
 import pool from "./db";
 import { generateOTP, sendOTPEmail } from "./otpUtils";
+import multer from "multer";
+import path from "path";
 
+// --------------------
+// Multer configuration
+// --------------------
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, "uploads/");
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `user_${Date.now()}${ext}`);
+    },
+});
+const upload = multer({ storage });
+
+// --------------------
+// Router
+// --------------------
 const router = express.Router();
 
 // ========================
@@ -30,10 +49,8 @@ router.get("/me", authenticateToken, async (req: Request, res: Response) => {
             "SELECT id, first_name, middle_name, last_name, phone_number, personal_house_address, user_image, verified, user_type FROM users WHERE id = $1",
             [userId]
         );
-
         const user = result.rows[0];
         if (!user) return res.status(404).json({ message: "User not found" });
-
         res.json(user);
     } catch (error: any) {
         res.status(500).json({ message: "Error fetching user", error: error.message });
@@ -97,46 +114,50 @@ router.post("/", async (req: Request, res: Response) => {
 // ========================
 // Update current logged-in user
 // ========================
-router.patch("/me", authenticateToken, async (req: Request, res: Response) => {
-    try {
-        const userId = (req as any).user.id;
-        const {
-            first_name,
-            middle_name,
-            last_name,
-            phone_number,
-            personal_house_address,
-            user_image,
-        } = req.body;
+router.patch(
+    "/me",
+    authenticateToken,
+    upload.single("user_image"),
+    async (req: Request, res: Response) => {
+        try {
+            const userId = (req as any).user.id;
+            const { first_name, middle_name, last_name, phone_number, personal_house_address } = req.body;
 
-        const updates: string[] = [];
-        const values: any[] = [];
-        let idx = 1;
+            const updates: string[] = [];
+            const values: any[] = [];
+            let idx = 1;
 
-        if (first_name) { updates.push(`first_name = $${idx++}`); values.push(first_name); }
-        if (middle_name) { updates.push(`middle_name = $${idx++}`); values.push(middle_name); }
-        if (last_name) { updates.push(`last_name = $${idx++}`); values.push(last_name); }
-        if (phone_number) { updates.push(`phone_number = $${idx++}`); values.push(phone_number); }
-        if (personal_house_address) { updates.push(`personal_house_address = $${idx++}`); values.push(personal_house_address); }
-        if (user_image) { updates.push(`user_image = $${idx++}`); values.push(user_image); }
+            if (first_name) { updates.push(`first_name = $${idx++}`); values.push(first_name); }
+            if (middle_name) { updates.push(`middle_name = $${idx++}`); values.push(middle_name); }
+            if (last_name) { updates.push(`last_name = $${idx++}`); values.push(last_name); }
+            if (phone_number) { updates.push(`phone_number = $${idx++}`); values.push(phone_number); }
+            if (personal_house_address) { updates.push(`personal_house_address = $${idx++}`); values.push(personal_house_address); }
 
-        if (updates.length === 0) return res.status(400).json({ message: "No fields to update" });
+            // Multer file
+            const file = (req as any).file;
+            if (file) {
+                updates.push(`user_image = $${idx++}`);
+                values.push(`/uploads/${file.filename}`);
+            }
 
-        values.push(userId);
+            if (updates.length === 0) return res.status(400).json({ message: "No fields to update" });
 
-        const query = `
-          UPDATE users
-          SET ${updates.join(", ")}
-          WHERE id = $${idx}
-          RETURNING id, first_name, middle_name, last_name, phone_number, personal_house_address, user_image, verified, user_type
-        `;
+            values.push(userId);
 
-        const result = await pool.query(query, values);
+            const query = `
+        UPDATE users
+        SET ${updates.join(", ")}
+        WHERE id = $${idx}
+        RETURNING id, first_name, middle_name, last_name, phone_number, personal_house_address, user_image, verified, user_type
+      `;
 
-        res.json({ message: "User updated", user: result.rows[0] });
-    } catch (error: any) {
-        res.status(500).json({ message: "Error updating user", error: error.message });
+            const result = await pool.query(query, values);
+
+            res.json({ message: "User updated", user: result.rows[0] });
+        } catch (error: any) {
+            console.error(error);
+            res.status(500).json({ message: "Error updating user", error: error.message });
+        }
     }
-});
-
+);
 export default router;
