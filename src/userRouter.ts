@@ -121,39 +121,50 @@ router.patch(
     async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user.id;
-            const { first_name, middle_name, last_name, phone_number, personal_house_address } = req.body;
+
+            const {
+                first_name,
+                middle_name,
+                last_name,
+                phone_number,
+                personal_house_address,
+            } = req.body;
 
             const updates: string[] = [];
             const values: any[] = [];
-            let idx = 1;
+            let i = 1;
 
-            if (first_name) { updates.push(`first_name = $${idx++}`); values.push(first_name); }
-            if (middle_name) { updates.push(`middle_name = $${idx++}`); values.push(middle_name); }
-            if (last_name) { updates.push(`last_name = $${idx++}`); values.push(last_name); }
-            if (phone_number) { updates.push(`phone_number = $${idx++}`); values.push(phone_number); }
-            if (personal_house_address) { updates.push(`personal_house_address = $${idx++}`); values.push(personal_house_address); }
+            if (first_name) { updates.push(`first_name = $${i++}`); values.push(first_name); }
+            if (middle_name) { updates.push(`middle_name = $${i++}`); values.push(middle_name); }
+            if (last_name) { updates.push(`last_name = $${i++}`); values.push(last_name); }
+            if (phone_number) { updates.push(`phone_number = $${i++}`); values.push(phone_number); }
+            if (personal_house_address) { updates.push(`personal_house_address = $${i++}`); values.push(personal_house_address); }
 
-            // Multer file
-            const file = (req as any).file;
-            if (file) {
-                updates.push(`user_image = $${idx++}`);
-                values.push(`/uploads/${file.filename}`);
+            // file upload
+            if (req.file) {
+                updates.push(`user_image = $${i++}`);
+                values.push(`/uploads/${req.file.filename}`);
             }
 
-            if (updates.length === 0) return res.status(400).json({ message: "No fields to update" });
+            if (updates.length === 0)
+                return res.status(400).json({ message: "No fields to update" });
 
             values.push(userId);
 
-            const query = `
-        UPDATE users
-        SET ${updates.join(", ")}
-        WHERE id = $${idx}
-        RETURNING id, first_name, middle_name, last_name, phone_number, personal_house_address, user_image, verified, user_type
-      `;
+            const sql = `
+                UPDATE users
+                SET ${updates.join(", ")}
+                WHERE id = $${i}
+                RETURNING *
+            `;
 
-            const result = await pool.query(query, values);
+            const result = await pool.query(sql, values);
 
-            res.json({ message: "User updated", user: result.rows[0] });
+            res.json({
+                message: "User updated",
+                user: result.rows[0],
+            });
+
         } catch (error: any) {
             console.error(error);
             res.status(500).json({ message: "Error updating user", error: error.message });

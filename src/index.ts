@@ -10,6 +10,9 @@ import path from "path";
 const app = express();
 const PORT = process.env.PORT || 2000;
 
+// Serve uploaded images
+app.use("/uploads", express.static("uploads"));
+
 // Swagger
 const swaggerDocument = YAML.load(path.join(__dirname, "../src/docs/swagger.yaml"));
 
