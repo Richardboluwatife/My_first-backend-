@@ -13,15 +13,11 @@ const PORT = 2000;
 // Swagger
 const swaggerDocument = YAML.load(path.join(__dirname, "../src/docs/swagger.yaml"));
 
-// CORS
+// CORS - allow requests from anywhere
 app.use(
     cors({
-        origin: (origin, callback) => {
-            if (!origin) return callback(null, true);
-            if (/^http:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
-            callback(new Error("Not allowed by CORS"));
-        },
-        credentials: true,
+        origin: "*", // Allow all origins
+        credentials: true, // Needed if you use cookies or auth headers
     })
 );
 
@@ -29,7 +25,7 @@ app.use(express.json());
 
 // Routers
 app.use("/auth", authRouter);
-app.use("/users", userRouter);  // <-- separate router for user endpoints
+app.use("/users", userRouter);
 app.use("/tasks", taskRouter);
 
 // Swagger Docs
