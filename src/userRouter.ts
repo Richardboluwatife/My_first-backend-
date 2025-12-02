@@ -107,7 +107,6 @@ router.patch("/me", authenticateToken, async (req: Request, res: Response) => {
             phone_number,
             personal_house_address,
             user_image,
-            password,
         } = req.body;
 
         const updates: string[] = [];
@@ -120,18 +119,17 @@ router.patch("/me", authenticateToken, async (req: Request, res: Response) => {
         if (phone_number) { updates.push(`phone_number = $${idx++}`); values.push(phone_number); }
         if (personal_house_address) { updates.push(`personal_house_address = $${idx++}`); values.push(personal_house_address); }
         if (user_image) { updates.push(`user_image = $${idx++}`); values.push(user_image); }
-        if (password) { const hashedPassword = await bcryptjs.hash(password, 10); updates.push(`password = $${idx++}`); values.push(hashedPassword); }
 
         if (updates.length === 0) return res.status(400).json({ message: "No fields to update" });
 
         values.push(userId);
 
         const query = `
-      UPDATE users
-      SET ${updates.join(", ")}
-      WHERE id = $${idx}
-      RETURNING id, first_name, middle_name, last_name, phone_number, personal_house_address, user_image, verified, user_type
-    `;
+          UPDATE users
+          SET ${updates.join(", ")}
+          WHERE id = $${idx}
+          RETURNING id, first_name, middle_name, last_name, phone_number, personal_house_address, user_image, verified, user_type
+        `;
 
         const result = await pool.query(query, values);
 

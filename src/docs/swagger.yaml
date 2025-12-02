@@ -208,10 +208,6 @@ paths:
                   type: string
                   format: binary
                   example: "base64encodedstring"
-                password:
-                  type: string
-                  format: password
-                  example: "newpassword123"
       responses:
         200:
           description: User updated successfully
