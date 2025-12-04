@@ -72,6 +72,9 @@ paths:
                     last_name:
                       type: string
                       example: Doe
+                    email:
+                      type: string
+                      example: "example@gmail.com"
                     phone_number:
                       type: string
                       example: "+2348012345678"
@@ -159,6 +162,9 @@ paths:
                   last_name:
                     type: string
                     example: Doe
+                  email:
+                    type: string
+                    example: "example@gmail.com"
                   phone_number:
                     type: string
                     example: "+2348012345678"
